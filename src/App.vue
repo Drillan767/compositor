@@ -1,160 +1,154 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import type { LayoutItemRequired } from 'grid-layout-plus'
+import { computed, ref, useTemplateRef } from 'vue'
+import { useMouse, useThrottleFn  } from '@vueuse/core'
+import { GridLayout, GridItem } from 'grid-layout-plus'
 
-const greetMsg = ref("");
-const name = ref("");
+const dropId = 'drop'
+const dragItem = { x: -1, y: -1, w: 2, h: 2, i: '' }
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
+const { x, y } = useMouse({ type: 'screen' })
+
+const layout1 = ref<LayoutItemRequired[]>([
+  { x: 0, y: 0, w: 2, h: 2, i: '0' },
+  { x: 2, y: 0, w: 2, h: 4, i: '1' }
+])
+
+const layout2 = ref<LayoutItemRequired[]>([
+  { x: 0, y: 0, w: 2, h: 4, i: '0' },
+  { x: 2, y: 0, w: 2, h: 4, i: '1' },
+  { x: 0, y: 4, w: 2, h: 4, i: '2' },
+  { x: 2, y: 4, w: 2, h: 4, i: '3' }
+])
+
+const wrapper1 = useTemplateRef<HTMLDivElement>('wrapper-1')
+const gridLayout1 = useTemplateRef<InstanceType<typeof GridLayout>>('grid-layout-1')
+
+const wrapper2 = useTemplateRef<HTMLDivElement>('wrapper-2')
+const gridLayout2 = useTemplateRef<InstanceType<typeof GridLayout>>('grid-layout-2')
+
+const wrapper1Rect = computed(() => {
+  const rect = wrapper1.value?.getBoundingClientRect()
+  return rect ?? null
+})
+
+const wrapper2Rect = computed(() => {
+  const rect = wrapper2.value?.getBoundingClientRect()
+  return rect ?? null
+})
+
+const drag = useThrottleFn((id: string) => {
+  if (!wrapper1Rect.value || !wrapper2Rect.value) return
+  if (!gridLayout1.value || !gridLayout2.value) return
+
+  const mouseInGrid1 = x.value > wrapper1Rect.value.left && 
+    x.value < wrapper1Rect.value.right &&
+    y.value > wrapper1Rect.value.top &&
+    y.value < wrapper1Rect.value.bottom
+
+  const mouseInGrid2 = x.value > wrapper2Rect.value.left && 
+    x.value < wrapper2Rect.value.right &&
+    y.value > wrapper2Rect.value.top &&
+    y.value < wrapper2Rect.value.bottom
+
+  if (mouseInGrid1 && !layout1.value.find(item => item.i === id)) {
+    layout1.value.push({
+      x: (layout1.value.length * 2) % 12,
+      y: layout1.value.length, // puts it at the bottom
+      w: 2,
+      h: 2,
+      i: dropId
+    })
+  }
+})
+
+const dragEnd = () => {
+  if (!wrapper1Rect.value || !wrapper2Rect.value) return
+  if (!gridLayout1.value || !gridLayout2.value) return
 }
+
 </script>
 
 <template>
   <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
+    <p>Premier layout</p>
+    <div class="wrapper-1">
+      <GridLayout
+        ref="grid-layout-1"
+        v-model:layout="layout1"
+        :col-num="12"
+        :row-height="30"
+        is-draggable
+        is-resizable
+        vertical-compact
+        use-css-transforms
+      >
 
-    <div class="row">
-      <a href="https://vitejs.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
+      </GridLayout>
     </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
+    <p>Second layout</p>
+    <div class="wrapper-2">
+      <GridLayout
+        ref="grid-layout-2"
+        v-model:layout="layout2"
+        :col-num="12"
+        :row-height="30"
+        is-draggable
+        is-resizable
+        vertical-compact
+        use-css-transforms
+      >
 
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
+      </GridLayout>
+    </div>
+    <hr />
+    <div
+      class="droppable-element"
+      draggable="true"
+      unselectable="on"
+      @drag="drag('item1')"
+      @dragend="dragEnd('item1')"
+    >
+      Droppable Element (Drag me!)
+    </div>
+    <div
+      class="droppable-element"
+      draggable="true"
+      unselectable="on"
+      @drag="drag('item2')"
+      @dragend="dragEnd('item2')"
+    >
+      Droppable Element (Drag me!)
+    </div>
   </main>
 </template>
 
+
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
+.vgl-layout {
+  background-color: #eee;
 }
 
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
+:deep(.vgl-item:not(.vgl-item--placeholder)) {
+  background-color: #ccc;
+  border: 1px solid black;
 }
 
-</style>
-<style>
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+:deep(.vgl-item--resizing) {
+  opacity: 90%;
 }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+:deep(.vgl-item--static) {
+  background-color: #cce;
+}
+
+.text {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: auto;
+  font-size: 24px;
   text-align: center;
 }
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
 </style>
