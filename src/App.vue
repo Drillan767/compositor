@@ -1,126 +1,115 @@
 <script setup lang="ts">
-import type { LayoutItemRequired } from 'grid-layout-plus'
-import { computed, ref, useTemplateRef } from 'vue'
+import type { LayoutItem } from 'grid-layout-plus'
+import { computed, ref, useTemplateRef, onBeforeUpdate, watch } from 'vue'
 import { useMouse, useThrottleFn  } from '@vueuse/core'
 import { GridLayout, GridItem } from 'grid-layout-plus'
+import CompositionPart from './components/CompositionPart.vue'
 
-const dropId = 'drop'
-const dragItem = { x: -1, y: -1, w: 2, h: 2, i: '' }
+interface POSLayout {
+    name: string
+    layout: LayoutItem[]
+}
 
-const { x, y } = useMouse({ type: 'screen' })
+const { x, y } = useMouse()
 
-const layout1 = ref<LayoutItemRequired[]>([
-  { x: 0, y: 0, w: 2, h: 2, i: '0' },
-  { x: 2, y: 0, w: 2, h: 4, i: '1' }
+const pocLayouts = ref<POSLayout[]>([
+    {
+        name: 'Part 1',
+        layout: [
+            { x: 0, y: 0, w: 1, h: 1, i: '0' },
+            { x: 1, y: 0, w: 1, h: 1, i: '1' }
+        ]
+    },
+    {
+        name: 'Part 2',
+        layout: [
+            { x: 0, y: 0, w: 1, h: 1, i: '0' },
+            { x: 1, y: 0, w: 1, h: 1, i: '1' },
+            { x: 2, y: 0, w: 1, h: 1, i: '2' },
+            { x: 3, y: 0, w: 1, h: 1, i: '3' },
+            { x: 4, y: 0, w: 1, h: 1, i: '4' }
+        ]
+    }
 ])
 
-const layout2 = ref<LayoutItemRequired[]>([
-  { x: 0, y: 0, w: 2, h: 4, i: '0' },
-  { x: 2, y: 0, w: 2, h: 4, i: '1' },
-  { x: 0, y: 4, w: 2, h: 4, i: '2' },
-  { x: 2, y: 4, w: 2, h: 4, i: '3' }
-])
+const compositionParts = ref<InstanceType<typeof CompositionPart>[]>([])
 
-const wrapper1 = useTemplateRef<HTMLDivElement>('wrapper-1')
-const gridLayout1 = useTemplateRef<InstanceType<typeof GridLayout>>('grid-layout-1')
+const checkDropTarget = (dropX: number, dropY: number) => {
+    /* if (!compositionParts.value) return false
+    for (const partRef of compositionParts.value) {
+        //const bounds = partRef.boundaries
+        if (!bounds) continue
 
-const wrapper2 = useTemplateRef<HTMLDivElement>('wrapper-2')
-const gridLayout2 = useTemplateRef<InstanceType<typeof GridLayout>>('grid-layout-2')
+        if (
+            dropX >= bounds.left && 
+            dropX <= bounds.right && 
+            dropY >= bounds.top && 
+            dropY <= bounds.bottom
+        ) {
+            return partRef // or return the component/index if you need to identify which one
+        }
+    }
+    return false */
+}
 
-const wrapper1Rect = computed(() => {
-  const rect = wrapper1.value?.getBoundingClientRect()
-  return rect ?? null
-})
+const drag = () => useThrottleFn(() => {
 
-const wrapper2Rect = computed(() => {
-  const rect = wrapper2.value?.getBoundingClientRect()
-  return rect ?? null
-})
-
-const drag = useThrottleFn((id: string) => {
-  if (!wrapper1Rect.value || !wrapper2Rect.value) return
-  if (!gridLayout1.value || !gridLayout2.value) return
-
-  const mouseInGrid1 = x.value > wrapper1Rect.value.left && 
-    x.value < wrapper1Rect.value.right &&
-    y.value > wrapper1Rect.value.top &&
-    y.value < wrapper1Rect.value.bottom
-
-  const mouseInGrid2 = x.value > wrapper2Rect.value.left && 
-    x.value < wrapper2Rect.value.right &&
-    y.value > wrapper2Rect.value.top &&
-    y.value < wrapper2Rect.value.bottom
-
-  if (mouseInGrid1 && !layout1.value.find(item => item.i === id)) {
-    layout1.value.push({
-      x: (layout1.value.length * 2) % 12,
-      y: layout1.value.length, // puts it at the bottom
-      w: 2,
-      h: 2,
-      i: dropId
-    })
-  }
 })
 
 const dragEnd = () => {
-  if (!wrapper1Rect.value || !wrapper2Rect.value) return
-  if (!gridLayout1.value || !gridLayout2.value) return
+    /* if (!compositionParts.value) return
+    for (const partRef of compositionParts.value) {
+        const bounds = partRef.boundaries
+        if (!bounds) continue
+        if (checkDropTarget(x.value, y.value)) {
+            console.log('drop')
+        }
+    } */
 }
+
+const updateParts = (el: any | null, index: number) => {
+    if (!el) return
+    compositionParts.value[index] = el
+}
+
+onBeforeUpdate(() => {
+    compositionParts.value = []
+})
+
+watch(compositionParts, (parts) => {
+    if (!parts || !parts.length) return
+
+    const hoveredPart = parts.findIndex(part => part.isHovered)
+    if (hoveredPart !== -1) {
+        console.log('hovered part', hoveredPart)
+    }
+})
 
 </script>
 
 <template>
-  <main class="container">
-    <p>Premier layout</p>
-    <div class="wrapper-1">
-      <GridLayout
-        ref="grid-layout-1"
-        v-model:layout="layout1"
-        :col-num="12"
-        :row-height="30"
-        is-draggable
-        is-resizable
-        vertical-compact
-        use-css-transforms
-      >
+    <main class="container">
+        <div class="test-wrapper">
+            <CompositionPart
+                v-for="(layout, index) in pocLayouts"
+                :key="layout.name"
+                :ref="el => updateParts(el, index)"
+                v-model="layout.layout"
+                :x
+                :y
+            />
+        </div>
 
-      </GridLayout>
-    </div>
-    <p>Second layout</p>
-    <div class="wrapper-2">
-      <GridLayout
-        ref="grid-layout-2"
-        v-model:layout="layout2"
-        :col-num="12"
-        :row-height="30"
-        is-draggable
-        is-resizable
-        vertical-compact
-        use-css-transforms
-      >
-
-      </GridLayout>
-    </div>
-    <hr />
-    <div
-      class="droppable-element"
-      draggable="true"
-      unselectable="on"
-      @drag="drag('item1')"
-      @dragend="dragEnd('item1')"
-    >
-      Droppable Element (Drag me!)
-    </div>
-    <div
-      class="droppable-element"
-      draggable="true"
-      unselectable="on"
-      @drag="drag('item2')"
-      @dragend="dragEnd('item2')"
-    >
-      Droppable Element (Drag me!)
-    </div>
-  </main>
+        <div
+            class="droppable-element"
+            draggable="true"
+            unselectable="on"
+            @drag="drag"
+            @dragend="dragEnd"
+        >
+            Droppable Element (Drag me!)
+        </div>
+    </main>
 </template>
 
 
@@ -150,5 +139,22 @@ const dragEnd = () => {
   margin: auto;
   font-size: 24px;
   text-align: center;
+}
+
+.test-wrapper {
+    display: flex;
+    gap: 10px;
+    max-width: 1700px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+
+.droppable-element {
+  width: 150px;
+  padding: 10px;
+  margin: 10px 0;
+  text-align: center;
+  background-color: #fdd;
+  border: 1px solid black;
 }
 </style>
